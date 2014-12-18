@@ -1,0 +1,9 @@
+{
+  "name": "mib-lsi-puppet",
+  "dependencies": {
+    "http-server": "^0.7.3"
+  },
+  "scripts": {
+    "start": "http-server -a localhost -p 8000 src/"
+  }
+}

@@ -1,0 +1,128 @@
+<html>
+	<head>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.0/angular.min.js"></script>
+		<script>
+angular.module('Test', [])
+.directive('ngClickSpinner', ['$parse', '$rootScope', '$q', function($parse, $rootScope, $q) {
+	return {
+        restrict: 'A',
+        compile: function($element, attr) {
+          // We expose the powerful $event object on the scope that provides access to the Window,
+          // etc. that isn't protected by the fast paths in $parse.  We explicitly request better
+          // checks at the cost of speed since event handler expressions are not executed as
+          // frequently as regular change detection.
+          var fn = $parse(attr["ngClickSpinner"], /* interceptorFn */ null, /* expensiveChecks */ true);
+          return function ngEventHandler(scope, element) {
+            element.on('click', function(event) {
+              var callback = function() {  
+				console.log("Click started");
+				$element.addClass("ng-click-spinner-started")  
+                $q.when(fn(scope, {$event:event})).then(function() {
+                	console.log("Click completed with success");
+					$element.addClass("ng-click-spinner-success");
+                }).catch(function() {
+                	console.log("Click completed with failure");
+					$element.addClass("ng-click-spinner-fail");
+                });
+              };
+              scope.$apply(callback);
+            });
+          };
+        }
+	}	
+}])
+
+function Ctrl($scope, $timeout, $q) {
+	
+	// classic callback
+	$scope.execution1 = "Execution 1 waiting"
+	$scope.execute1 = function() {
+		$scope.execution1 = "Execution 1 completed"
+	}
+
+	// long async callback
+	$scope.execution2 = "Execution 2 waiting"
+	$scope.execute2 = function() {
+		// don't forget to return
+		return $timeout(function() {$scope.execution2 = "Execution 1 completed"}, 2000);
+	}
+	
+
+	// This one does not work 
+	// return in the callback is important 
+	$scope.execution3 = "Execution 3 waiting"
+	$scope.execute3 = function() {
+		$timeout(function() {$scope.execution3 = "Execution 3 completed"}, 2000);
+	}
+	
+	// complex workflow
+	$scope.execution4_1 = "Execution 4_1 waiting"
+	$scope.execution4_2 = "Execution 4_2 waiting"
+	$scope.execute4 = function() {
+		// don't forget to return
+		return $q.all([
+			$timeout(function() {$scope.execution4_1 = "Execution 4_1 completed"}, 2000),
+			$timeout(function() {$scope.execution4_2 = "Execution 4_2 completed"}, 4000)
+		])
+			
+	}
+
+	// failing callback
+	$scope.execution5 = "Execution 5 waiting"
+	$scope.execute5 = function() {
+		
+		var defer = $q.defer(); 
+		$timeout(function() { $scope.execution5 = "Execution 5 fail with" ; defer.reject("ERROR")  }, 2000);
+		return defer.promise
+		.then(function() {$scope.execution5 = "Execution 5 completed" })
+	}
+	
+}		
+		
+		</script>
+<style>
+.ng-click-spinner-started {
+	background-color: blue;
+}
+
+.ng-click-spinner-success {
+	background-color: green;	
+}
+
+.ng-click-spinner-fail {
+	background-color: red;	
+}
+</style>
+
+	</head>
+	<body ng-app="Test" ng-controller="Ctrl">
+		
+	<button ng-click-spinner="execute1()">Go 1</button> Short process
+		<br>
+		{{execution1}}
+
+<br>
+
+	<button ng-click-spinner="execute2()">Go 2</button> Long process
+		<br>
+		{{execution2}}
+
+<br>
+
+	<button ng-click-spinner="execute3()">Go 3</button> Long process (does not work)
+		<br>
+		{{execution3}}
+<br>
+
+	<button ng-click-spinner="execute4()">Go 4</button> complex workflow
+		<br>
+		{{execution4_1}}<br>
+		{{execution4_2}}
+<br>
+
+	<button ng-click-spinner="execute5()">Go 5</button> failing process
+		<br>
+		{{execution5}}
+
+	</body>
+</html>
