@@ -2,34 +2,75 @@
 	<head>
 		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.0/angular.min.js"></script>
 		<script>
+			
+		
 angular.module('Test', [])
-.directive('ngClickSpinner', ['$parse', '$rootScope', '$q', function($parse, $rootScope, $q) {
+.directive('ngClickSpinner', ['$parse', '$rootScope', '$q', '$compile', function($parse, $rootScope, $q, $compile) {
+	  uuid4 = function() {
+	    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,  function(cc) {
+	    	var rr = Math.random() * 16 | 0; return (cc === 'x' ? rr : (rr & 0x3 | 0x8)).toString(16);
+	  	});
+	  };
+	  
 	return {
         restrict: 'A',
-        compile: function($element, attr) {
-          // We expose the powerful $event object on the scope that provides access to the Window,
-          // etc. that isn't protected by the fast paths in $parse.  We explicitly request better
-          // checks at the cost of speed since event handler expressions are not executed as
-          // frequently as regular change detection.
-          var fn = $parse(attr["ngClickSpinner"], /* interceptorFn */ null, /* expensiveChecks */ true);
-          return function ngEventHandler(scope, element) {
+		terminal: true,
+      	priority: 1000,
+		link : function(scope, element, attr) {
+			var spinGroup = uuid4()	
+			if (attr["spinGroup"]) {
+				spinGroup = attr["spinGroup"]
+			} else {
+				element.attr("spin-group", spinGroup)
+			}
+				   
+	  	  	// We expose the powerful $event object on the scope that provides access to the Window,
+	  	  	// etc. that isn't protected by the fast paths in $parse.  We explicitly request better
+	  	  	// checks at the cost of speed since event handler expressions are not executed as
+	  	  	// frequently as regular change detection.
+	  	  	var fn = $parse(attr["ngClickSpinner"], /* interceptorFn */ null, /* expensiveChecks */ true);
             element.on('click', function(event) {
               var callback = function() {  
 				console.log("Click started");
-				$element.addClass("ng-click-spinner-started")  
+				scope.$broadcast(spinGroup+"started");
+				
                 $q.when(fn(scope, {$event:event})).then(function() {
                 	console.log("Click completed with success");
-					$element.addClass("ng-click-spinner-success");
+					scope.$broadcast(spinGroup+"success");
                 }).catch(function() {
                 	console.log("Click completed with failure");
-					$element.addClass("ng-click-spinner-fail");
+					scope.$broadcast(spinGroup+"fail");
                 });
               };
               scope.$apply(callback);
             });
-          };
-        }
-	}	
+			element.removeAttr("ng-click-spinner");
+			$compile(element)(scope)
+		}	
+	}
+}]).directive('spinGroup', [function() {
+	return {
+		restrict: 'A',
+		link: function (scope, element, attr) {
+			console.log("Spin group init")
+ 		   scope.$on(attr["spinGroup"]+"started", function() {
+ 			  element.removeClass("ng-click-spinner-success") 
+ 			  element.removeClass("ng-click-spinner-fail") 
+ 		   	  element.addClass("ng-click-spinner-started")  
+ 		   })
+		   scope.$on(attr["spinGroup"]+"success", function() {
+			  element.addClass("ng-click-spinner-success") 
+			  element.removeClass("ng-click-spinner-fail") 
+		   	  element.removeClass("ng-click-spinner-started")  
+		   })
+		   scope.$on(attr["spinGroup"]+"fail", function() {
+			  element.removeClass("ng-click-spinner-success") 
+			  element.addClass("ng-click-spinner-fail") 
+		   	  element.removeClass("ng-click-spinner-started")  
+		   })
+		}
+	}
+	
 }])
 
 function Ctrl($scope, $timeout, $q) {
@@ -77,6 +118,18 @@ function Ctrl($scope, $timeout, $q) {
 		.then(function() {$scope.execution5 = "Execution 5 completed" })
 	}
 	
+
+
+	// failing callback
+	$scope.execution6 = "Execution 6 waiting"
+	$scope.execute6_1 = function() {
+		return $timeout(function() {$scope.execution6 = "Execution 6 completed"}, 2000);
+	}
+
+	$scope.execute6_2 = function() {
+		return $timeout(function() {$scope.execution6 = "Execution 6 completed"}, 2000);
+	}
+	
 }		
 		
 		</script>
@@ -101,28 +154,33 @@ function Ctrl($scope, $timeout, $q) {
 		<br>
 		{{execution1}}
 
-<br>
+<br><br>
 
 	<button ng-click-spinner="execute2()">Go 2</button> Long process
 		<br>
 		{{execution2}}
 
-<br>
+<br><br>
 
 	<button ng-click-spinner="execute3()">Go 3</button> Long process (does not work)
 		<br>
 		{{execution3}}
-<br>
+<br><br>
 
 	<button ng-click-spinner="execute4()">Go 4</button> complex workflow
 		<br>
 		{{execution4_1}}<br>
 		{{execution4_2}}
-<br>
+<br><br>
 
 	<button ng-click-spinner="execute5()">Go 5</button> failing process
 		<br>
 		{{execution5}}
+<hr>
+	<button ng-click-spinner="execute6_1()" spin-group="group1">Go 6_1</button> 
+	<button ng-click-spinner="execute6_2()" spin-group="group1">Go 6_2</button> 
+		<br>
+		{{execution6}}
 
 	</body>
 </html>
